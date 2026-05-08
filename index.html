@@ -1,0 +1,543 @@
+```html
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador PRO: Arte Hachurada para SVG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #3b82f6;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .bg-checkerboard {
+            background-image: linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
+                              linear-gradient(-45deg, #e5e7eb 25%, transparent 25%),
+                              linear-gradient(45deg, transparent 75%, #e5e7eb 75%),
+                              linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        .toggle-checkbox:checked { right: 0; border-color: #3b82f6; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #3b82f6; }
+        
+        .layer-btn.active { background-color: #3b82f6; color: white; border-color: #3b82f6; }
+        .layer-btn { transition: all 0.2s; }
+        
+        /* Oculta a scrollbar nativa do input range do slider de comparação */
+        .comparison-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 1px;
+            height: 100%;
+            cursor: ew-resize;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800 pb-12">
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <div class="inline-block bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-3 tracking-widest uppercase">Versão PRO 4.0</div>
+            <h1 class="text-3xl md:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">Foto <i data-lucide="arrow-right" class="inline-block mx-1 text-blue-500"></i> Nanquim <i data-lucide="arrow-right" class="inline-block mx-1 text-blue-500"></i> SVG</h1>
+            <p class="text-lg text-gray-600 max-w-3xl mx-auto">Vetorização avançada em camadas, otimização extrema e lente de comparação.</p>
+        </header>
+
+        <main class="space-y-6">
+            <!-- Zona de Upload e Configurações IA -->
+            <div id="setup-section" class="bg-white p-6 md:p-8 rounded-2xl shadow-md border border-gray-200">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    <!-- Coluna 1: Upload -->
+                    <div>
+                        <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="image"></i> 1. A sua Foto</h2>
+                        <input type="file" id="image-upload" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                        
+                        <label id="upload-label" for="image-upload" class="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl p-10 hover:bg-gray-50 transition-colors h-64">
+                            <i data-lucide="upload-cloud" class="w-12 h-12 text-gray-400 mb-3"></i>
+                            <span class="text-lg font-semibold text-gray-700">Carregar Imagem</span>
+                        </label>
+
+                        <div id="preview-container" class="hidden relative h-64 w-full">
+                            <img id="upload-preview" class="w-full h-full object-cover rounded-xl shadow-inner border border-gray-200" src="" alt="Pré-visualização">
+                            <button onclick="document.getElementById('image-upload').click()" class="absolute top-2 right-2 bg-white/90 p-2 rounded-lg shadow hover:bg-white text-gray-700">
+                                <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Coluna 2: Controles da IA -->
+                    <div class="flex flex-col justify-between">
+                        <div>
+                            <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="settings-2"></i> 2. Configurações da Arte (IA)</h2>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Estilo de Hachura</label>
+                                    <select id="ai-style" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
+                                        <option value="manga">Clássico (Estilo Mangá / Comic)</option>
+                                        <option value="moebius">Limpo (Estilo Linha Clara / Moebius)</option>
+                                        <option value="noir">Alto Contraste (Estilo Noir / Sin City)</option>
+                                        <option value="sketch">Rascunho (Sketch caótico)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Densidade de Hachuras</label>
+                                    <select id="ai-density" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
+                                        <option value="medium">Média (Equilibrada)</option>
+                                        <option value="light">Pouca (Foco nos contornos)</option>
+                                        <option value="heavy">Muita (Sombreado denso e escuro)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Cenário / Fundo</label>
+                                    <select id="ai-background" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
+                                        <option value="remove">Remover (Fundo puramente branco/vazio)</option>
+                                        <option value="keep">Manter Fundo Original (Estilizado)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button id="generate-btn" onclick="startProcess()" disabled class="mt-6 w-full bg-blue-600 disabled:bg-gray-400 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] flex justify-center items-center gap-2 text-lg">
+                            <i data-lucide="zap"></i> Gerar Ilustração
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading UI -->
+            <div id="loading-section" class="hidden bg-white p-12 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center justify-center text-center h-80">
+                <div class="spinner mb-6"></div>
+                <h3 id="loading-text" class="text-2xl font-semibold text-gray-800">A processar...</h3>
+                <p class="text-gray-500 mt-2" id="loading-subtext">A aguardar resposta da Inteligência Artificial.</p>
+            </div>
+
+            <!-- Área de Resultados -->
+            <div id="results-section" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <!-- Fase 1: IA -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col">
+                    <h3 class="text-lg font-bold mb-3 flex items-center gap-2"><i data-lucide="brush" class="text-purple-500"></i> Arte Base (IA)</h3>
+                    <div class="bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center flex-1 border border-gray-200">
+                        <img id="ai-result-image" class="w-full h-auto max-h-[500px] object-contain" src="" alt="Imagem IA">
+                    </div>
+                </div>
+
+                <!-- Fase 2: SVG -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col">
+                    <h3 class="text-lg font-bold mb-3 flex items-center justify-between">
+                        <div class="flex items-center gap-2"><i data-lucide="vector" class="text-blue-500"></i> Lente de Comparação (SVG)</div>
+                    </h3>
+                    
+                    <!-- Lente de Comparação Antes/Depois -->
+                    <div id="svg-preview-bg" class="bg-checkerboard rounded-xl overflow-hidden flex items-center justify-center min-h-[350px] border border-gray-300 relative select-none">
+                        
+                        <!-- Imagem Original (Fundo) -->
+                        <img id="compare-original" src="" class="absolute inset-0 w-full h-full object-contain opacity-50 pointer-events-none" style="filter: grayscale(100%);">
+                        
+                        <!-- Container SVG (Com Clip-Path) -->
+                        <div id="compare-svg" class="absolute inset-0 w-full h-full bg-transparent flex items-center justify-center pointer-events-none" style="clip-path: inset(0 0 0 50%);">
+                            <div id="svg-container" class="w-full h-full flex items-center justify-center p-2 bg-white/10 backdrop-blur-sm"></div>
+                        </div>
+
+                        <!-- Slider invisível para controlo -->
+                        <input type="range" min="0" max="100" value="50" class="comparison-slider absolute inset-0 w-full h-full opacity-0 z-20 cursor-ew-resize m-0 p-0" oninput="updateComparison(this.value)">
+
+                        <!-- Linha Divisória Visual -->
+                        <div id="compare-line" class="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-10 pointer-events-none left-[50%] transform -translate-x-1/2">
+                            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white border-2 border-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                                <i data-lucide="chevrons-left-right" class="w-4 h-4 text-blue-500"></i>
+                            </div>
+                            <div class="absolute top-4 left-4 bg-black/60 text-white text-[10px] px-2 py-1 rounded shadow pointer-events-none whitespace-nowrap">Foto</div>
+                            <div class="absolute top-4 right-4 bg-black/60 text-white text-[10px] px-2 py-1 rounded shadow pointer-events-none whitespace-nowrap">Vetor</div>
+                        </div>
+                    </div>
+
+                    <!-- Configurações SVG Pós-Processamento -->
+                    <div class="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200 text-sm">
+                        <h4 class="font-bold text-gray-800 mb-3 border-b pb-2 flex justify-between items-center">
+                            Ajustes do Vetor (Em tempo real)
+                        </h4>
+                        
+                        <!-- Novas Ferramentas V4.0 -->
+                        <div class="grid grid-cols-2 gap-4 mb-3">
+                            <div class="flex items-center justify-between">
+                                <span class="font-medium text-gray-700">Fundo Transparente</span>
+                                <div class="relative inline-block w-10 mr-2 align-middle">
+                                    <input type="checkbox" id="transparency-toggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer z-10" checked onchange="applySVGSettings()"/>
+                                    <label for="transparency-toggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between" title="Remove as dezenas de casas decimais para reduzir o peso do ficheiro em 60%">
+                                <span class="font-medium text-gray-700 flex items-center gap-1"><i data-lucide="file-json-2" class="w-4 h-4"></i> Minifier SVG</span>
+                                <div class="relative inline-block w-10 mr-2 align-middle">
+                                    <input type="checkbox" id="minify-toggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer z-10" checked onchange="applySVGSettings()"/>
+                                    <label for="minify-toggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Toggle Modo de Traço -->
+                        <div class="flex items-center justify-between mb-2 mt-4">
+                            <span class="font-medium text-gray-700">Forçar Espessura Fixa (Stroke)</span>
+                            <div class="relative inline-block w-10 mr-2 align-middle select-none">
+                                <input type="checkbox" id="mode-toggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer z-10" checked onchange="applySVGSettings()"/>
+                                <label for="mode-toggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                            </div>
+                        </div>
+
+                        <div id="stroke-controls" class="mb-4 ml-4 pl-4 border-l-2 border-blue-200">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs text-gray-600">Espessura (px)</span>
+                                <span class="text-xs font-bold text-blue-600" id="stroke-value">4px</span>
+                            </div>
+                            <input type="range" id="stroke-width-slider" min="0.5" max="10" step="0.5" value="4" class="w-full h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer" oninput="applySVGSettings()">
+                        </div>
+
+                        <!-- Camadas (Heurística) -->
+                        <div>
+                            <span class="font-medium text-gray-700 block mb-2">Visibilidade de Camadas (Extração Inteligente)</span>
+                            <div class="flex gap-2">
+                                <button id="layer-outlines" onclick="toggleLayer('camada-contornos', this)" class="layer-btn active flex-1 border border-gray-300 rounded-md py-1.5 text-xs font-semibold">Contornos</button>
+                                <button id="layer-hachures" onclick="toggleLayer('camada-hachuras', this)" class="layer-btn active flex-1 border border-gray-300 rounded-md py-1.5 text-xs font-semibold">Hachuras</button>
+                                <button id="layer-bg" onclick="toggleLayer('camada-fundo', this)" class="layer-btn border border-gray-300 rounded-md py-1.5 text-xs font-semibold hidden">Fundo</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botões de Ação -->
+                    <div class="mt-4 flex gap-2">
+                        <button onclick="downloadSVG()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-4 rounded-xl flex justify-center items-center gap-2 transition-colors">
+                            <i data-lucide="download" class="w-5 h-5"></i> Guardar SVG
+                        </button>
+                        <button onclick="copySVGCode()" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-bold py-2.5 px-4 rounded-xl flex justify-center items-center gap-2 transition-colors">
+                            <i data-lucide="code" class="w-5 h-5"></i> Copiar Código
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative" role="alert">
+                <strong class="font-bold">Erro!</strong>
+                <span class="block sm:inline" id="error-text">Ocorreu um erro ao processar.</span>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        const apiKey = ""; 
+        let currentBase64Original = null;
+        let finalSVGString = "";
+        let originalSvgDoc = null; 
+        let layersState = { 'camada-contornos': true, 'camada-hachuras': true, 'camada-fundo': false };
+
+        function updateComparison(value) {
+            // value is 0 to 100
+            // No clip-path, mostramos a percentagem de 100% - value para a esquerda
+            const invertValue = 100 - value;
+            document.getElementById('compare-svg').style.clipPath = `inset(0 0 0 ${invertValue}%)`;
+            document.getElementById('compare-line').style.left = `${value}%`;
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    currentBase64Original = e.target.result;
+                    document.getElementById('upload-preview').src = currentBase64Original;
+                    document.getElementById('compare-original').src = currentBase64Original;
+                    document.getElementById('upload-label').classList.add('hidden');
+                    document.getElementById('preview-container').classList.remove('hidden');
+                    document.getElementById('generate-btn').disabled = false;
+                    document.getElementById('results-section').classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function buildAIPrompt() {
+            const style = document.getElementById('ai-style').value;
+            const density = document.getElementById('ai-density').value;
+            const background = document.getElementById('ai-background').value;
+
+            let prompt = `Atue como um mestre ilustrador. Analise a foto e recrie-a estritamente com hachuras a preto e branco puro (zero tons de cinza).\n`;
+            
+            if(style === 'manga') prompt += "Use estilo clássico de mangá/comic, contornos bem definidos.\n";
+            else if(style === 'moebius') prompt += "Use estilo 'linha clara' (Moebius), limpo, técnico e preciso.\n";
+            else if(style === 'noir') prompt += "Use estilo Noir, alto contraste, massas negras combinadas com hachuras marcadas.\n";
+            else if(style === 'sketch') prompt += "Use estilo rascunho caótico, linhas sobrepostas.\n";
+
+            if(density === 'light') prompt += "Hachuras muito dispersas (poucas), focadas nas sombras escuras. Deixe muita área branca.\n";
+            else if(density === 'heavy') prompt += "Sombreado escuro e denso, cross-hatching intenso.\n";
+            else prompt += "Hachuras equilibradas.\n";
+
+            if(background === 'remove') prompt += "Remova completamente o fundo. Fundo deve ser branco vazio.\n";
+            else prompt += "Mantenha o fundo original simplificado com hachuras leves.\n";
+
+            return prompt;
+        }
+
+        async function fetchWithBackoff(url, options, maxRetries = 5) {
+            let retries = 0;
+            while (retries < maxRetries) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) throw new Error(`Erro API: ${response.status}`);
+                    return await response.json();
+                } catch (error) {
+                    retries++;
+                    if (retries >= maxRetries) throw error;
+                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries - 1) * 1000));
+                }
+            }
+        }
+
+        async function startProcess() {
+            if (!currentBase64Original) return;
+
+            document.getElementById('setup-section').classList.add('hidden');
+            document.getElementById('loading-section').classList.remove('hidden');
+            document.getElementById('error-message').classList.add('hidden');
+
+            try {
+                // FASE 1
+                const customPrompt = buildAIPrompt();
+                document.getElementById('loading-text').innerText = "Fase 1: A ilustrar (IA)...";
+                document.getElementById('loading-subtext').innerText = "A desenhar em nanquim...";
+                
+                const mimeType = currentBase64Original.split(';')[0].split(':')[1];
+                const base64Data = currentBase64Original.split(',')[1];
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: customPrompt }, { inlineData: { mimeType: mimeType, data: base64Data } }] }],
+                    generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+                };
+
+                const result = await fetchWithBackoff(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const imagePart = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+                if (!imagePart) throw new Error("A IA não retornou imagem.");
+
+                const aiGeneratedBase64 = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+                document.getElementById('ai-result-image').src = aiGeneratedBase64;
+
+                // FASE 2
+                document.getElementById('loading-text').innerText = "Fase 2: A vetorizar...";
+                document.getElementById('loading-subtext').innerText = "A separar camadas e aplicar otimizações matemáticas.";
+                
+                setTimeout(() => vectorizeImage(aiGeneratedBase64), 500);
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('error-text').innerText = error.message;
+                document.getElementById('error-message').classList.remove('hidden');
+                document.getElementById('loading-section').classList.add('hidden');
+                document.getElementById('setup-section').classList.remove('hidden');
+            }
+        }
+
+        function vectorizeImage(base64Image) {
+            const options = {
+                ltres: 1, qtres: 1, pathomit: 6, colorsampling: 0, numberofcolors: 2,
+                mincolorratio: 0, colorquantcycles: 3, layering: 0, strokewidth: 0,
+                linefilter: false, scale: 1, roundcoords: 2, viewbox: true, blurradius: 0, blurdelta: 20
+            };
+
+            ImageTracer.imageToSVG(base64Image, function(svgString) { buildSVGLayers(svgString); }, options);
+        }
+
+        function buildSVGLayers(svgString) {
+            const parser = new DOMParser();
+            const rawDoc = parser.parseFromString(svgString, "image/svg+xml");
+            const svgElement = rawDoc.querySelector('svg');
+            
+            const origWidth = svgElement.getAttribute('width');
+            const origHeight = svgElement.getAttribute('height');
+            if (origWidth && origHeight && !svgElement.getAttribute('viewBox')) {
+                svgElement.setAttribute('viewBox', `0 0 ${origWidth} ${origHeight}`);
+            }
+            
+            // Garantir que a preview preserva as proporções para a lente de comparação
+            svgElement.setAttribute('width', '100%');
+            svgElement.setAttribute('height', '100%');
+            svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+            
+            const gFundo = rawDoc.createElementNS('http://www.w3.org/2000/svg', 'g');
+            gFundo.setAttribute('id', 'camada-fundo');
+            const gHachuras = rawDoc.createElementNS('http://www.w3.org/2000/svg', 'g');
+            gHachuras.setAttribute('id', 'camada-hachuras');
+            const gContornos = rawDoc.createElementNS('http://www.w3.org/2000/svg', 'g');
+            gContornos.setAttribute('id', 'camada-contornos');
+
+            const paths = Array.from(rawDoc.querySelectorAll('path'));
+            paths.forEach(p => {
+                const fill = p.getAttribute('fill');
+                const isWhite = fill && (fill.includes('255') || fill === '#ffffff' || fill === 'white');
+                
+                if (isWhite) {
+                    p.classList.add('bg-path');
+                    gFundo.appendChild(p);
+                } else {
+                    p.classList.add('ink-path');
+                    if (p.getAttribute('d').length > 350) gContornos.appendChild(p);
+                    else gHachuras.appendChild(p);
+                }
+            });
+
+            svgElement.innerHTML = '';
+            svgElement.appendChild(gFundo);
+            svgElement.appendChild(gHachuras);
+            svgElement.appendChild(gContornos);
+
+            originalSvgDoc = rawDoc;
+            
+            const hasBg = document.getElementById('ai-background').value === 'keep';
+            document.getElementById('transparency-toggle').checked = !hasBg;
+            layersState['camada-fundo'] = hasBg;
+            
+            const btnBg = document.getElementById('layer-bg');
+            if(hasBg) {
+                btnBg.classList.remove('hidden');
+                btnBg.classList.add('active');
+            } else btnBg.classList.add('hidden');
+
+            applySVGSettings();
+
+            document.getElementById('loading-section').classList.add('hidden');
+            document.getElementById('results-section').classList.remove('hidden');
+            
+            // Reset Slider de comparação para o meio
+            const slider = document.querySelector('.comparison-slider');
+            slider.value = 50;
+            updateComparison(50);
+        }
+
+        function toggleLayer(layerId, btn) {
+            layersState[layerId] = !layersState[layerId];
+            if(layersState[layerId]) {
+                btn.classList.add('active');
+                btn.classList.remove('bg-white', 'text-gray-700');
+            } else {
+                btn.classList.remove('active');
+                btn.classList.add('bg-white', 'text-gray-700');
+            }
+            applySVGSettings();
+        }
+
+        function applySVGSettings() {
+            if (!originalSvgDoc) return;
+
+            const workDoc = originalSvgDoc.cloneNode(true);
+            const isTransparent = document.getElementById('transparency-toggle').checked;
+            const isStrokeMode = document.getElementById('mode-toggle').checked;
+            const isMinified = document.getElementById('minify-toggle').checked;
+            const strokeVal = document.getElementById('stroke-width-slider').value;
+            
+            document.getElementById('stroke-value').innerText = strokeVal + "px";
+            document.getElementById('stroke-controls').style.opacity = isStrokeMode ? "1" : "0.4";
+            document.getElementById('stroke-width-slider').disabled = !isStrokeMode;
+            
+            // Lógica do Fundo e do Fundo do Compare Container
+            const compareBg = document.getElementById('svg-preview-bg');
+            if(isTransparent) {
+                compareBg.classList.add('bg-checkerboard');
+                compareBg.classList.remove('bg-white');
+            } else {
+                compareBg.classList.add('bg-white');
+                compareBg.classList.remove('bg-checkerboard');
+            }
+
+            const layerFundo = workDoc.getElementById('camada-fundo');
+            if(isTransparent || !layersState['camada-fundo']) {
+                if(layerFundo) layerFundo.remove(); 
+            }
+
+            if(!layersState['camada-contornos']) { const l = workDoc.getElementById('camada-contornos'); if(l) l.remove(); }
+            if(!layersState['camada-hachuras']) { const l = workDoc.getElementById('camada-hachuras'); if(l) l.remove(); }
+
+            const inkPaths = workDoc.querySelectorAll('.ink-path');
+            inkPaths.forEach(p => {
+                if (isStrokeMode) {
+                    p.setAttribute('fill', 'none');
+                    p.setAttribute('stroke', 'black');
+                    p.setAttribute('stroke-width', strokeVal + 'px');
+                    p.setAttribute('stroke-linecap', 'round');
+                    p.setAttribute('stroke-linejoin', 'round');
+                } else {
+                    p.setAttribute('fill', 'black');
+                    p.setAttribute('stroke', 'none');
+                }
+            });
+
+            // OTIMIZAÇÃO (Minifier)
+            // Remove casas decimais excessivas geradas pela biblioteca (reduz tamanho em até 60%)
+            if (isMinified) {
+                const allPathsToMinify = workDoc.querySelectorAll('path');
+                allPathsToMinify.forEach(p => {
+                    let d = p.getAttribute('d');
+                    if(d) {
+                        // Regex: Procura por números com mais de 1 casa decimal e arredonda
+                        d = d.replace(/\d+\.\d{2,}/g, match => parseFloat(match).toFixed(1));
+                        p.setAttribute('d', d);
+                    }
+                });
+            }
+
+            const serializer = new XMLSerializer();
+            finalSVGString = serializer.serializeToString(workDoc);
+            document.getElementById('svg-container').innerHTML = finalSVGString;
+        }
+
+        function downloadSVG() {
+            if (!finalSVGString) return;
+            let exportString = finalSVGString;
+            if(!exportString.includes('xmlns="http://www.w3.org/2000/svg"')) {
+                exportString = exportString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+            }
+
+            const blob = new Blob([exportString], {type: "image/svg+xml;charset=utf-8"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "arte_final_vetorial.svg";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function copySVGCode() {
+            if (!finalSVGString) return;
+            const textArea = document.createElement("textarea");
+            textArea.value = finalSVGString;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert("Código SVG otimizado e copiado! Pronto para ser usado.");
+            } catch (err) {
+                console.error("Falha ao copiar", err);
+            }
+            document.body.removeChild(textArea);
+        }
+    </script>
+</body>
+</html>

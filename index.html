@@ -1,115 +1,121 @@
-```html
 <!DOCTYPE html>
 <html lang="pt-PT">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerador PRO: Arte Hachurada para SVG</title>
+    <title>Gerador PRO 5.1: Máscaras, Batch e Exportação Inteligente</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top: 4px solid #3b82f6;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid #3b82f6; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        .bg-checkerboard {
-            background-image: linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
-                              linear-gradient(-45deg, #e5e7eb 25%, transparent 25%),
-                              linear-gradient(45deg, transparent 75%, #e5e7eb 75%),
-                              linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
-            background-size: 20px 20px;
-            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-        }
-
+        .bg-checkerboard { background-image: linear-gradient(45deg, #e5e7eb 25%, transparent 25%), linear-gradient(-45deg, #e5e7eb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e7eb 75%), linear-gradient(-45deg, transparent 75%, #e5e7eb 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px; }
         .toggle-checkbox:checked { right: 0; border-color: #3b82f6; }
         .toggle-checkbox:checked + .toggle-label { background-color: #3b82f6; }
-        
         .layer-btn.active { background-color: #3b82f6; color: white; border-color: #3b82f6; }
         .layer-btn { transition: all 0.2s; }
+        .comparison-slider::-webkit-slider-thumb { appearance: none; width: 1px; height: 100%; cursor: ew-resize; }
         
-        /* Oculta a scrollbar nativa do input range do slider de comparação */
-        .comparison-slider::-webkit-slider-thumb {
-            appearance: none;
-            width: 1px;
-            height: 100%;
-            cursor: ew-resize;
-        }
+        /* Canvas Layering */
+        .canvas-container { position: relative; width: 100%; height: 300px; background: #eee; border-radius: 0.5rem; overflow: hidden; }
+        #base-image-canvas, #mask-visual-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; cursor: crosshair; }
+        #mask-visual-canvas { z-index: 10; opacity: 0.6; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-800 pb-12">
 
     <div class="max-w-7xl mx-auto px-4 py-8">
         <header class="text-center mb-8">
-            <div class="inline-block bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-3 tracking-widest uppercase">Versão PRO 4.0</div>
-            <h1 class="text-3xl md:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">Foto <i data-lucide="arrow-right" class="inline-block mx-1 text-blue-500"></i> Nanquim <i data-lucide="arrow-right" class="inline-block mx-1 text-blue-500"></i> SVG</h1>
-            <p class="text-lg text-gray-600 max-w-3xl mx-auto">Vetorização avançada em camadas, otimização extrema e lente de comparação.</p>
+            <div class="inline-block bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-3 tracking-widest uppercase">Versão 5.1 Ultimate</div>
+            <h1 class="text-3xl md:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">Vetorizador <i data-lucide="arrow-right" class="inline-block mx-1 text-purple-500"></i> Hachuras IA</h1>
+            <p class="text-lg text-gray-600 max-w-3xl mx-auto">Upload de 1 a 3 imagens (Download Normal). Mais de 3 imagens gera ficheiro .ZIP.</p>
         </header>
 
         <main class="space-y-6">
-            <!-- Zona de Upload e Configurações IA -->
+            <!-- Zona de Upload -->
             <div id="setup-section" class="bg-white p-6 md:p-8 rounded-2xl shadow-md border border-gray-200">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     
-                    <!-- Coluna 1: Upload -->
-                    <div>
-                        <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="image"></i> 1. A sua Foto</h2>
-                        <input type="file" id="image-upload" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                    <!-- Coluna 1: Upload e Máscara -->
+                    <div class="flex flex-col">
+                        <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="image"></i> 1. As Suas Fotos</h2>
+                        
+                        <input type="file" id="image-upload" accept="image/*" multiple class="hidden" onchange="handleImageUpload(event)">
                         
                         <label id="upload-label" for="image-upload" class="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl p-10 hover:bg-gray-50 transition-colors h-64">
                             <i data-lucide="upload-cloud" class="w-12 h-12 text-gray-400 mb-3"></i>
-                            <span class="text-lg font-semibold text-gray-700">Carregar Imagem</span>
+                            <span class="text-lg font-semibold text-gray-700">Carregar Imagem (ou Múltiplas)</span>
+                            <span class="text-sm text-gray-500 mt-2 text-center">1 a 3 fotos: Individual | 4 ou mais: Ficheiro ZIP</span>
                         </label>
 
-                        <div id="preview-container" class="hidden relative h-64 w-full">
-                            <img id="upload-preview" class="w-full h-full object-cover rounded-xl shadow-inner border border-gray-200" src="" alt="Pré-visualização">
-                            <button onclick="document.getElementById('image-upload').click()" class="absolute top-2 right-2 bg-white/90 p-2 rounded-lg shadow hover:bg-white text-gray-700">
-                                <i data-lucide="refresh-cw" class="w-5 h-5"></i>
-                            </button>
+                        <!-- Modo Múltiplas Fotos UI -->
+                        <div id="batch-preview" class="hidden flex-col items-center justify-center h-64 bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                            <i data-lucide="files" class="w-12 h-12 text-blue-500 mb-2"></i>
+                            <span id="batch-count" class="text-xl font-bold text-blue-800">0 Fotos Selecionadas</span>
+                            <span id="batch-mode-desc" class="text-sm text-blue-600 mt-1">Serão descarregadas individualmente.</span>
+                            <button onclick="document.getElementById('image-upload').click()" class="mt-4 text-sm font-semibold text-blue-700 hover:underline">Selecionar outras</button>
+                        </div>
+
+                        <!-- Modo Single com Máscara UI -->
+                        <div id="single-preview" class="hidden relative w-full flex-col">
+                            <div class="canvas-container shadow-inner border border-gray-200 relative bg-gray-900">
+                                <canvas id="base-image-canvas"></canvas>
+                                <canvas id="mask-visual-canvas" onmousedown="startDraw(event)" onmousemove="draw(event)" onmouseup="endDraw()" onmouseout="endDraw()" ontouchstart="startDraw(event)" ontouchmove="draw(event)" ontouchend="endDraw()"></canvas>
+                            </div>
+                            
+                            <div class="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="font-semibold text-sm text-gray-700 flex items-center gap-1"><i data-lucide="paintbrush" class="w-4 h-4"></i> Pincel de Máscara (Opcional)</span>
+                                    <button onclick="clearMask()" class="text-xs text-red-600 hover:text-red-800 font-bold">Limpar Tudo</button>
+                                </div>
+                                <p class="text-xs text-gray-500 mb-3">Pinte a área que deseja <b>manter como foto real</b>.</p>
+                                <div class="flex gap-4 items-center">
+                                    <input type="range" id="brush-size" min="5" max="100" value="30" class="w-full">
+                                    <div class="flex gap-2">
+                                        <button onclick="setBrush('draw')" id="btn-draw" class="bg-blue-600 text-white p-2 rounded shadow hover:bg-blue-700"><i data-lucide="pen-tool" class="w-4 h-4"></i></button>
+                                        <button onclick="setBrush('erase')" id="btn-erase" class="bg-gray-300 text-gray-700 p-2 rounded shadow hover:bg-gray-400"><i data-lucide="eraser" class="w-4 h-4"></i></button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Coluna 2: Controles da IA -->
+                    <!-- Coluna 2: Controles -->
                     <div class="flex flex-col justify-between">
                         <div>
-                            <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="settings-2"></i> 2. Configurações da Arte (IA)</h2>
+                            <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="settings-2"></i> 2. Configurações Globais</h2>
                             <div class="space-y-4">
                                 <div>
                                     <label class="block text-sm font-semibold text-gray-700 mb-1">Estilo de Hachura</label>
-                                    <select id="ai-style" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
-                                        <option value="manga">Clássico (Estilo Mangá / Comic)</option>
-                                        <option value="moebius">Limpo (Estilo Linha Clara / Moebius)</option>
-                                        <option value="noir">Alto Contraste (Estilo Noir / Sin City)</option>
-                                        <option value="sketch">Rascunho (Sketch caótico)</option>
+                                    <select id="ai-style" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2.5">
+                                        <option value="manga">Clássico (Mangá / Comic)</option>
+                                        <option value="moebius">Limpo (Linha Clara)</option>
+                                        <option value="noir">Alto Contraste (Noir)</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Densidade de Hachuras</label>
-                                    <select id="ai-density" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
-                                        <option value="medium">Média (Equilibrada)</option>
-                                        <option value="light">Pouca (Foco nos contornos)</option>
-                                        <option value="heavy">Muita (Sombreado denso e escuro)</option>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Densidade</label>
+                                    <select id="ai-density" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2.5">
+                                        <option value="medium">Média</option>
+                                        <option value="light">Pouca</option>
+                                        <option value="heavy">Muita</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Cenário / Fundo</label>
-                                    <select id="ai-background" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
-                                        <option value="remove">Remover (Fundo puramente branco/vazio)</option>
-                                        <option value="keep">Manter Fundo Original (Estilizado)</option>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Fundo Original</label>
+                                    <select id="ai-background" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2.5">
+                                        <option value="remove">Remover Branco</option>
+                                        <option value="keep">Vetorizar Fundo</option>
                                     </select>
                                 </div>
                             </div>
                         </div>
 
-                        <button id="generate-btn" onclick="startProcess()" disabled class="mt-6 w-full bg-blue-600 disabled:bg-gray-400 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] flex justify-center items-center gap-2 text-lg">
-                            <i data-lucide="zap"></i> Gerar Ilustração
+                        <button id="generate-btn" onclick="startProcessFlow()" disabled class="mt-6 w-full bg-purple-600 disabled:bg-gray-400 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] flex justify-center items-center gap-2 text-lg">
+                            <i data-lucide="zap"></i> Iniciar Processamento
                         </button>
                     </div>
                 </div>
@@ -119,13 +125,21 @@
             <div id="loading-section" class="hidden bg-white p-12 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center justify-center text-center h-80">
                 <div class="spinner mb-6"></div>
                 <h3 id="loading-text" class="text-2xl font-semibold text-gray-800">A processar...</h3>
-                <p class="text-gray-500 mt-2" id="loading-subtext">A aguardar resposta da Inteligência Artificial.</p>
+                <p class="text-gray-500 mt-2" id="loading-subtext">A comunicar com a IA.</p>
+                
+                <div id="batch-progress-container" class="hidden w-full max-w-md mt-6">
+                    <div class="flex justify-between text-sm font-medium mb-1">
+                        <span id="batch-status" class="text-blue-700">Foto 1 de X</span>
+                        <span id="batch-percent" class="text-blue-700">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div id="batch-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Área de Resultados -->
+            <!-- Área de Resultados (Apenas Modo Único) -->
             <div id="results-section" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
-                <!-- Fase 1: IA -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col">
                     <h3 class="text-lg font-bold mb-3 flex items-center gap-2"><i data-lucide="brush" class="text-purple-500"></i> Arte Base (IA)</h3>
                     <div class="bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center flex-1 border border-gray-200">
@@ -133,162 +147,212 @@
                     </div>
                 </div>
 
-                <!-- Fase 2: SVG -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col">
                     <h3 class="text-lg font-bold mb-3 flex items-center justify-between">
-                        <div class="flex items-center gap-2"><i data-lucide="vector" class="text-blue-500"></i> Lente de Comparação (SVG)</div>
+                        <div class="flex items-center gap-2"><i data-lucide="vector" class="text-blue-500"></i> Resultado Final SVG</div>
                     </h3>
                     
-                    <!-- Lente de Comparação Antes/Depois -->
                     <div id="svg-preview-bg" class="bg-checkerboard rounded-xl overflow-hidden flex items-center justify-center min-h-[350px] border border-gray-300 relative select-none">
-                        
-                        <!-- Imagem Original (Fundo) -->
-                        <img id="compare-original" src="" class="absolute inset-0 w-full h-full object-contain opacity-50 pointer-events-none" style="filter: grayscale(100%);">
-                        
-                        <!-- Container SVG (Com Clip-Path) -->
-                        <div id="compare-svg" class="absolute inset-0 w-full h-full bg-transparent flex items-center justify-center pointer-events-none" style="clip-path: inset(0 0 0 50%);">
-                            <div id="svg-container" class="w-full h-full flex items-center justify-center p-2 bg-white/10 backdrop-blur-sm"></div>
-                        </div>
-
-                        <!-- Slider invisível para controlo -->
-                        <input type="range" min="0" max="100" value="50" class="comparison-slider absolute inset-0 w-full h-full opacity-0 z-20 cursor-ew-resize m-0 p-0" oninput="updateComparison(this.value)">
-
-                        <!-- Linha Divisória Visual -->
-                        <div id="compare-line" class="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-10 pointer-events-none left-[50%] transform -translate-x-1/2">
-                            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white border-2 border-blue-500 rounded-full flex items-center justify-center shadow-lg">
-                                <i data-lucide="chevrons-left-right" class="w-4 h-4 text-blue-500"></i>
-                            </div>
-                            <div class="absolute top-4 left-4 bg-black/60 text-white text-[10px] px-2 py-1 rounded shadow pointer-events-none whitespace-nowrap">Foto</div>
-                            <div class="absolute top-4 right-4 bg-black/60 text-white text-[10px] px-2 py-1 rounded shadow pointer-events-none whitespace-nowrap">Vetor</div>
-                        </div>
+                        <div id="svg-container" class="w-full h-full flex items-center justify-center p-2"></div>
                     </div>
 
-                    <!-- Configurações SVG Pós-Processamento -->
                     <div class="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200 text-sm">
-                        <h4 class="font-bold text-gray-800 mb-3 border-b pb-2 flex justify-between items-center">
-                            Ajustes do Vetor (Em tempo real)
-                        </h4>
-                        
-                        <!-- Novas Ferramentas V4.0 -->
                         <div class="grid grid-cols-2 gap-4 mb-3">
                             <div class="flex items-center justify-between">
                                 <span class="font-medium text-gray-700">Fundo Transparente</span>
-                                <div class="relative inline-block w-10 mr-2 align-middle">
-                                    <input type="checkbox" id="transparency-toggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer z-10" checked onchange="applySVGSettings()"/>
-                                    <label for="transparency-toggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
-                                </div>
+                                <input type="checkbox" id="transparency-toggle" class="toggle-checkbox" checked onchange="applySVGSettings()"/>
                             </div>
-                            
-                            <div class="flex items-center justify-between" title="Remove as dezenas de casas decimais para reduzir o peso do ficheiro em 60%">
-                                <span class="font-medium text-gray-700 flex items-center gap-1"><i data-lucide="file-json-2" class="w-4 h-4"></i> Minifier SVG</span>
-                                <div class="relative inline-block w-10 mr-2 align-middle">
-                                    <input type="checkbox" id="minify-toggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer z-10" checked onchange="applySVGSettings()"/>
-                                    <label for="minify-toggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
-                                </div>
+                            <div class="flex items-center justify-between">
+                                <span class="font-medium text-gray-700">Minifier SVG</span>
+                                <input type="checkbox" id="minify-toggle" class="toggle-checkbox" checked onchange="applySVGSettings()"/>
                             </div>
-                        </div>
-
-                        <!-- Toggle Modo de Traço -->
-                        <div class="flex items-center justify-between mb-2 mt-4">
-                            <span class="font-medium text-gray-700">Forçar Espessura Fixa (Stroke)</span>
-                            <div class="relative inline-block w-10 mr-2 align-middle select-none">
-                                <input type="checkbox" id="mode-toggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer z-10" checked onchange="applySVGSettings()"/>
-                                <label for="mode-toggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
-                            </div>
-                        </div>
-
-                        <div id="stroke-controls" class="mb-4 ml-4 pl-4 border-l-2 border-blue-200">
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="text-xs text-gray-600">Espessura (px)</span>
-                                <span class="text-xs font-bold text-blue-600" id="stroke-value">4px</span>
-                            </div>
-                            <input type="range" id="stroke-width-slider" min="0.5" max="10" step="0.5" value="4" class="w-full h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer" oninput="applySVGSettings()">
-                        </div>
-
-                        <!-- Camadas (Heurística) -->
-                        <div>
-                            <span class="font-medium text-gray-700 block mb-2">Visibilidade de Camadas (Extração Inteligente)</span>
-                            <div class="flex gap-2">
-                                <button id="layer-outlines" onclick="toggleLayer('camada-contornos', this)" class="layer-btn active flex-1 border border-gray-300 rounded-md py-1.5 text-xs font-semibold">Contornos</button>
-                                <button id="layer-hachures" onclick="toggleLayer('camada-hachuras', this)" class="layer-btn active flex-1 border border-gray-300 rounded-md py-1.5 text-xs font-semibold">Hachuras</button>
-                                <button id="layer-bg" onclick="toggleLayer('camada-fundo', this)" class="layer-btn border border-gray-300 rounded-md py-1.5 text-xs font-semibold hidden">Fundo</button>
+                            <div class="flex items-center justify-between col-span-2">
+                                <span class="font-medium text-gray-700">Espessura (Stroke) <span id="stroke-value" class="font-bold text-blue-600 ml-2">4px</span></span>
+                                <input type="range" id="stroke-width-slider" min="0.5" max="10" step="0.5" value="4" class="w-1/2" oninput="applySVGSettings()">
                             </div>
                         </div>
                     </div>
 
-                    <!-- Botões de Ação -->
                     <div class="mt-4 flex gap-2">
-                        <button onclick="downloadSVG()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-4 rounded-xl flex justify-center items-center gap-2 transition-colors">
-                            <i data-lucide="download" class="w-5 h-5"></i> Guardar SVG
+                        <button onclick="downloadSVG()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2">
+                            <i data-lucide="download"></i> Guardar Imagem
                         </button>
-                        <button onclick="copySVGCode()" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-bold py-2.5 px-4 rounded-xl flex justify-center items-center gap-2 transition-colors">
-                            <i data-lucide="code" class="w-5 h-5"></i> Copiar Código
+                        <button onclick="copySVGCode()" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2">
+                            <i data-lucide="code"></i> Copiar Código
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative" role="alert">
+            <!-- UI Sucesso Múltiplas Imagens (Individual ou ZIP) -->
+            <div id="batch-success" class="hidden bg-green-50 p-10 rounded-2xl border border-green-200 text-center max-w-3xl mx-auto">
+                <i data-lucide="check-circle" class="w-20 h-20 text-green-500 mx-auto mb-4"></i>
+                <h2 class="text-3xl font-bold text-green-800 mb-2">Processamento Concluído!</h2>
+                <p class="text-green-600 mb-6" id="batch-success-text">As suas imagens foram processadas com sucesso.</p>
+                
+                <!-- Botão ZIP -->
+                <button id="btn-download-zip" onclick="downloadZip()" class="hidden bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-10 rounded-xl shadow-lg items-center justify-center gap-2 mx-auto text-lg w-full max-w-md">
+                    <i data-lucide="archive"></i> Descarregar Ficheiro ZIP
+                </button>
+
+                <!-- Botões Individuais (Gerados via JS se <= 3) -->
+                <div id="individual-downloads" class="hidden flex flex-col gap-3 max-w-md mx-auto">
+                    <!-- Injectados via código -->
+                </div>
+
+                <button onclick="location.reload()" class="mt-6 text-sm font-semibold text-green-700 hover:underline">Vetorizar novas imagens</button>
+            </div>
+
+            <!-- Mensagem de Erro -->
+            <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mt-6" role="alert">
                 <strong class="font-bold">Erro!</strong>
                 <span class="block sm:inline" id="error-text">Ocorreu um erro ao processar.</span>
             </div>
+
         </main>
     </div>
 
     <script>
         lucide.createIcons();
 
+        // Variável API Key requerida pelo ambiente. Preencha aqui para usar no seu GitHub, ou deixe vazio para injetar.
         const apiKey = ""; 
+
+        // Estados Globais
+        let uploadedFiles = [];
+        let generatedZip = null;
+        let generatedIndividualFiles = [];
+        
         let currentBase64Original = null;
         let finalSVGString = "";
         let originalSvgDoc = null; 
-        let layersState = { 'camada-contornos': true, 'camada-hachuras': true, 'camada-fundo': false };
-
-        function updateComparison(value) {
-            // value is 0 to 100
-            // No clip-path, mostramos a percentagem de 100% - value para a esquerda
-            const invertValue = 100 - value;
-            document.getElementById('compare-svg').style.clipPath = `inset(0 0 0 ${invertValue}%)`;
-            document.getElementById('compare-line').style.left = `${value}%`;
-        }
+        
+        let baseImgObj = new Image();
+        let maskCtx, visualCtx;
+        let isDrawing = false;
+        let brushMode = 'draw';
+        let hasMask = false;
 
         function handleImageUpload(event) {
-            const file = event.target.files[0];
-            if (file) {
+            uploadedFiles = Array.from(event.target.files);
+            if (uploadedFiles.length === 0) return;
+
+            document.getElementById('upload-label').classList.add('hidden');
+            document.getElementById('generate-btn').disabled = false;
+            document.getElementById('results-section').classList.add('hidden');
+            document.getElementById('batch-success').classList.add('hidden');
+
+            if (uploadedFiles.length > 1) {
+                // Modo Múltiplas (Individual ou ZIP)
+                document.getElementById('batch-preview').classList.remove('hidden');
+                document.getElementById('batch-preview').classList.add('flex');
+                document.getElementById('single-preview').classList.add('hidden');
+                document.getElementById('batch-count').innerText = `${uploadedFiles.length} Fotos Selecionadas`;
+                
+                const desc = document.getElementById('batch-mode-desc');
+                const btnGen = document.getElementById('generate-btn');
+                
+                if (uploadedFiles.length <= 3) {
+                    desc.innerText = "Modo Múltiplas: Serão descarregadas individualmente.";
+                    btnGen.innerHTML = `<i data-lucide="zap"></i> Processar Múltiplas Fotos`;
+                } else {
+                    desc.innerText = "Modo Lote (Batch): Serão agrupadas num ficheiro ZIP.";
+                    btnGen.innerHTML = `<i data-lucide="zap"></i> Processar Lote (.ZIP)`;
+                }
+                lucide.createIcons();
+            } else {
+                // Single Mode com Máscara
+                document.getElementById('batch-preview').classList.add('hidden');
+                document.getElementById('batch-preview').classList.remove('flex');
+                document.getElementById('single-preview').classList.remove('hidden');
+                document.getElementById('single-preview').classList.add('flex');
+
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     currentBase64Original = e.target.result;
-                    document.getElementById('upload-preview').src = currentBase64Original;
-                    document.getElementById('compare-original').src = currentBase64Original;
-                    document.getElementById('upload-label').classList.add('hidden');
-                    document.getElementById('preview-container').classList.remove('hidden');
-                    document.getElementById('generate-btn').disabled = false;
-                    document.getElementById('results-section').classList.add('hidden');
+                    setupMaskCanvas(currentBase64Original);
                 };
-                reader.readAsDataURL(file);
+                reader.readAsDataURL(uploadedFiles[0]);
             }
         }
 
+        // --- MÁSCARA CANVAS ---
+        function setupMaskCanvas(base64) {
+            baseImgObj.onload = function() {
+                const baseCanvas = document.getElementById('base-image-canvas');
+                const visualCanvas = document.getElementById('mask-visual-canvas');
+                baseCanvas.width = baseImgObj.width; baseCanvas.height = baseImgObj.height;
+                visualCanvas.width = baseImgObj.width; visualCanvas.height = baseImgObj.height;
+                const bCtx = baseCanvas.getContext('2d');
+                bCtx.drawImage(baseImgObj, 0, 0);
+
+                visualCtx = visualCanvas.getContext('2d');
+                visualCtx.lineCap = 'round'; visualCtx.lineJoin = 'round';
+
+                const realMaskCanvas = document.createElement('canvas');
+                realMaskCanvas.width = baseImgObj.width; realMaskCanvas.height = baseImgObj.height;
+                maskCtx = realMaskCanvas.getContext('2d');
+                maskCtx.fillStyle = 'black'; maskCtx.fillRect(0, 0, baseImgObj.width, baseImgObj.height);
+                maskCtx.lineCap = 'round'; maskCtx.lineJoin = 'round';
+                hasMask = false;
+            }
+            baseImgObj.src = base64;
+        }
+
+        function getPointerPos(e) {
+            const rect = document.getElementById('mask-visual-canvas').getBoundingClientRect();
+            let cX = e.clientX, cY = e.clientY;
+            if(e.touches && e.touches.length > 0) { cX = e.touches[0].clientX; cY = e.touches[0].clientY; }
+            const scaleX = baseImgObj.width / rect.width;
+            const scaleY = baseImgObj.height / rect.height;
+            return { x: (cX - rect.left) * scaleX, y: (cY - rect.top) * scaleY };
+        }
+
+        function startDraw(e) { isDrawing = true; draw(e); }
+        function endDraw() { isDrawing = false; visualCtx.beginPath(); maskCtx.beginPath(); }
+        function setBrush(mode) {
+            brushMode = mode;
+            document.getElementById('btn-draw').classList.toggle('bg-blue-600', mode === 'draw');
+            document.getElementById('btn-draw').classList.toggle('text-white', mode === 'draw');
+            document.getElementById('btn-erase').classList.toggle('bg-blue-600', mode === 'erase');
+            document.getElementById('btn-erase').classList.toggle('text-white', mode === 'erase');
+        }
+        function clearMask() {
+            visualCtx.clearRect(0,0, visualCtx.canvas.width, visualCtx.canvas.height);
+            maskCtx.fillStyle = 'black'; maskCtx.fillRect(0,0, maskCtx.canvas.width, maskCtx.canvas.height);
+            hasMask = false;
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            hasMask = true;
+            const pos = getPointerPos(e);
+            const size = document.getElementById('brush-size').value;
+
+            visualCtx.lineWidth = size;
+            visualCtx.strokeStyle = brushMode === 'draw' ? 'rgba(59, 130, 246, 0.5)' : 'rgba(0,0,0,1)';
+            visualCtx.globalCompositeOperation = brushMode === 'draw' ? 'source-over' : 'destination-out';
+            visualCtx.lineTo(pos.x, pos.y); visualCtx.stroke();
+            visualCtx.beginPath(); visualCtx.moveTo(pos.x, pos.y);
+
+            maskCtx.lineWidth = size;
+            maskCtx.strokeStyle = brushMode === 'draw' ? 'white' : 'black';
+            maskCtx.globalCompositeOperation = 'source-over';
+            maskCtx.lineTo(pos.x, pos.y); maskCtx.stroke();
+            maskCtx.beginPath(); maskCtx.moveTo(pos.x, pos.y);
+        }
+
+        // --- IA E VETOR ---
         function buildAIPrompt() {
             const style = document.getElementById('ai-style').value;
             const density = document.getElementById('ai-density').value;
-            const background = document.getElementById('ai-background').value;
-
-            let prompt = `Atue como um mestre ilustrador. Analise a foto e recrie-a estritamente com hachuras a preto e branco puro (zero tons de cinza).\n`;
-            
-            if(style === 'manga') prompt += "Use estilo clássico de mangá/comic, contornos bem definidos.\n";
-            else if(style === 'moebius') prompt += "Use estilo 'linha clara' (Moebius), limpo, técnico e preciso.\n";
-            else if(style === 'noir') prompt += "Use estilo Noir, alto contraste, massas negras combinadas com hachuras marcadas.\n";
-            else if(style === 'sketch') prompt += "Use estilo rascunho caótico, linhas sobrepostas.\n";
-
-            if(density === 'light') prompt += "Hachuras muito dispersas (poucas), focadas nas sombras escuras. Deixe muita área branca.\n";
-            else if(density === 'heavy') prompt += "Sombreado escuro e denso, cross-hatching intenso.\n";
-            else prompt += "Hachuras equilibradas.\n";
-
-            if(background === 'remove') prompt += "Remova completamente o fundo. Fundo deve ser branco vazio.\n";
-            else prompt += "Mantenha o fundo original simplificado com hachuras leves.\n";
-
-            return prompt;
+            const bg = document.getElementById('ai-background').value;
+            let p = `Ilustre esta foto em preto e branco puro usando hachuras.\n`;
+            if(style === 'manga') p += "Estilo mangá.\n"; else if(style === 'moebius') p += "Estilo limpo.\n"; else p += "Estilo noir.\n";
+            if(density === 'heavy') p += "Muito denso.\n"; else if(density === 'light') p += "Poucas hachuras.\n";
+            if(bg === 'remove') p += "Fundo branco.\n";
+            return p;
         }
 
         async function fetchWithBackoff(url, options, maxRetries = 5) {
@@ -301,242 +365,236 @@
                 } catch (error) {
                     retries++;
                     if (retries >= maxRetries) throw error;
-                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries - 1) * 1000));
+                    await new Promise(r => setTimeout(r, Math.pow(2, retries - 1) * 1000));
                 }
             }
         }
 
-        async function startProcess() {
-            if (!currentBase64Original) return;
+        async function generateAIImage(base64) {
+            const mimeType = base64.split(';')[0].split(':')[1];
+            const data = base64.split(',')[1];
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: buildAIPrompt() }, { inlineData: { mimeType, data } }] }],
+                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+            };
+            const result = await fetchWithBackoff(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const part = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+            if (!part) throw new Error("A IA falhou em devolver uma imagem.");
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        }
 
+        function vectorizeToDoc(base64Image) {
+            return new Promise(resolve => {
+                const options = { ltres: 1, qtres: 1, pathomit: 6, colorsampling: 0, numberofcolors: 2, scale: 1, roundcoords: 2, viewbox: true };
+                ImageTracer.imageToSVG(base64Image, function(svgStr) {
+                    resolve(new DOMParser().parseFromString(svgStr, "image/svg+xml"));
+                }, options);
+            });
+        }
+
+        // --- FLUXO PRINCIPAL ---
+        async function startProcessFlow() {
             document.getElementById('setup-section').classList.add('hidden');
             document.getElementById('loading-section').classList.remove('hidden');
             document.getElementById('error-message').classList.add('hidden');
 
             try {
-                // FASE 1
-                const customPrompt = buildAIPrompt();
-                document.getElementById('loading-text').innerText = "Fase 1: A ilustrar (IA)...";
-                document.getElementById('loading-subtext').innerText = "A desenhar em nanquim...";
-                
-                const mimeType = currentBase64Original.split(';')[0].split(':')[1];
-                const base64Data = currentBase64Original.split(',')[1];
-                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
-                
-                const payload = {
-                    contents: [{ parts: [{ text: customPrompt }, { inlineData: { mimeType: mimeType, data: base64Data } }] }],
-                    generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
-                };
-
-                const result = await fetchWithBackoff(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                const imagePart = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-                if (!imagePart) throw new Error("A IA não retornou imagem.");
-
-                const aiGeneratedBase64 = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
-                document.getElementById('ai-result-image').src = aiGeneratedBase64;
-
-                // FASE 2
-                document.getElementById('loading-text').innerText = "Fase 2: A vetorizar...";
-                document.getElementById('loading-subtext').innerText = "A separar camadas e aplicar otimizações matemáticas.";
-                
-                setTimeout(() => vectorizeImage(aiGeneratedBase64), 500);
-
-            } catch (error) {
-                console.error(error);
-                document.getElementById('error-text').innerText = error.message;
+                if (uploadedFiles.length === 1) await processSingle();
+                else await processMultiple();
+            } catch (err) {
+                console.error(err);
+                document.getElementById('error-text').innerText = err.message;
                 document.getElementById('error-message').classList.remove('hidden');
                 document.getElementById('loading-section').classList.add('hidden');
                 document.getElementById('setup-section').classList.remove('hidden');
             }
         }
 
-        function vectorizeImage(base64Image) {
-            const options = {
-                ltres: 1, qtres: 1, pathomit: 6, colorsampling: 0, numberofcolors: 2,
-                mincolorratio: 0, colorquantcycles: 3, layering: 0, strokewidth: 0,
-                linefilter: false, scale: 1, roundcoords: 2, viewbox: true, blurradius: 0, blurdelta: 20
-            };
+        // ÚNICA IMAGEM
+        async function processSingle() {
+            document.getElementById('loading-text').innerText = "A ilustrar...";
+            const aiBase64 = await generateAIImage(currentBase64Original);
+            document.getElementById('ai-result-image').src = aiBase64;
 
-            ImageTracer.imageToSVG(base64Image, function(svgString) { buildSVGLayers(svgString); }, options);
-        }
-
-        function buildSVGLayers(svgString) {
-            const parser = new DOMParser();
-            const rawDoc = parser.parseFromString(svgString, "image/svg+xml");
-            const svgElement = rawDoc.querySelector('svg');
-            
-            const origWidth = svgElement.getAttribute('width');
-            const origHeight = svgElement.getAttribute('height');
-            if (origWidth && origHeight && !svgElement.getAttribute('viewBox')) {
-                svgElement.setAttribute('viewBox', `0 0 ${origWidth} ${origHeight}`);
-            }
-            
-            // Garantir que a preview preserva as proporções para a lente de comparação
-            svgElement.setAttribute('width', '100%');
-            svgElement.setAttribute('height', '100%');
-            svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-            
-            const gFundo = rawDoc.createElementNS('http://www.w3.org/2000/svg', 'g');
-            gFundo.setAttribute('id', 'camada-fundo');
-            const gHachuras = rawDoc.createElementNS('http://www.w3.org/2000/svg', 'g');
-            gHachuras.setAttribute('id', 'camada-hachuras');
-            const gContornos = rawDoc.createElementNS('http://www.w3.org/2000/svg', 'g');
-            gContornos.setAttribute('id', 'camada-contornos');
-
-            const paths = Array.from(rawDoc.querySelectorAll('path'));
-            paths.forEach(p => {
-                const fill = p.getAttribute('fill');
-                const isWhite = fill && (fill.includes('255') || fill === '#ffffff' || fill === 'white');
-                
-                if (isWhite) {
-                    p.classList.add('bg-path');
-                    gFundo.appendChild(p);
-                } else {
-                    p.classList.add('ink-path');
-                    if (p.getAttribute('d').length > 350) gContornos.appendChild(p);
-                    else gHachuras.appendChild(p);
-                }
-            });
-
-            svgElement.innerHTML = '';
-            svgElement.appendChild(gFundo);
-            svgElement.appendChild(gHachuras);
-            svgElement.appendChild(gContornos);
-
-            originalSvgDoc = rawDoc;
-            
-            const hasBg = document.getElementById('ai-background').value === 'keep';
-            document.getElementById('transparency-toggle').checked = !hasBg;
-            layersState['camada-fundo'] = hasBg;
-            
-            const btnBg = document.getElementById('layer-bg');
-            if(hasBg) {
-                btnBg.classList.remove('hidden');
-                btnBg.classList.add('active');
-            } else btnBg.classList.add('hidden');
+            document.getElementById('loading-text').innerText = "A vetorizar...";
+            const svgDoc = await vectorizeToDoc(aiBase64);
+            originalSvgDoc = formatSVGDoc(svgDoc, true);
 
             applySVGSettings();
 
             document.getElementById('loading-section').classList.add('hidden');
             document.getElementById('results-section').classList.remove('hidden');
-            
-            // Reset Slider de comparação para o meio
-            const slider = document.querySelector('.comparison-slider');
-            slider.value = 50;
-            updateComparison(50);
         }
 
-        function toggleLayer(layerId, btn) {
-            layersState[layerId] = !layersState[layerId];
-            if(layersState[layerId]) {
-                btn.classList.add('active');
-                btn.classList.remove('bg-white', 'text-gray-700');
-            } else {
-                btn.classList.remove('active');
-                btn.classList.add('bg-white', 'text-gray-700');
+        // MÚLTIPLAS IMAGENS
+        function readFileAsBase64(file) {
+            return new Promise(r => { const reader = new FileReader(); reader.onload = () => r(reader.result); reader.readAsDataURL(file); });
+        }
+
+        async function processMultiple() {
+            document.getElementById('batch-progress-container').classList.remove('hidden');
+            document.getElementById('batch-progress-container').classList.add('block');
+            
+            const zip = new JSZip();
+            generatedIndividualFiles = [];
+            const total = uploadedFiles.length;
+            const isZipMode = total > 3;
+
+            for (let i = 0; i < total; i++) {
+                const perc = Math.round((i / total) * 100);
+                document.getElementById('batch-status').innerText = `A processar foto ${i+1} de ${total}`;
+                document.getElementById('batch-percent').innerText = `${perc}%`;
+                document.getElementById('batch-bar').style.width = `${perc}%`;
+
+                const file64 = await readFileAsBase64(uploadedFiles[i]);
+                const aiBase64 = await generateAIImage(file64);
+                const svgDoc = await vectorizeToDoc(aiBase64);
+                
+                const formattedDoc = formatSVGDoc(svgDoc, false); // false = sem máscara global
+                applySettingsToDoc(formattedDoc);
+                
+                let finalStr = new XMLSerializer().serializeToString(formattedDoc);
+                if(!finalStr.includes('xmlns="http://www.w3.org/2000/svg"')) finalStr = finalStr.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+
+                const fileName = `arte_hachurada_0${i+1}.svg`;
+                
+                if (isZipMode) {
+                    zip.file(fileName, finalStr);
+                } else {
+                    generatedIndividualFiles.push({ name: fileName, content: finalStr });
+                }
             }
-            applySVGSettings();
+
+            document.getElementById('batch-bar').style.width = `100%`;
+            document.getElementById('loading-section').classList.add('hidden');
+            document.getElementById('batch-success').classList.remove('hidden');
+
+            const btnZip = document.getElementById('btn-download-zip');
+            const boxIndiv = document.getElementById('individual-downloads');
+            
+            if (isZipMode) {
+                generatedZip = await zip.generateAsync({type:"blob"});
+                document.getElementById('batch-success-text').innerText = `${total} imagens foram empacotadas no ZIP com sucesso.`;
+                btnZip.classList.remove('hidden');
+                btnZip.classList.add('flex');
+                boxIndiv.classList.add('hidden');
+            } else {
+                document.getElementById('batch-success-text').innerText = `As suas ${total} imagens estão prontas para download.`;
+                btnZip.classList.add('hidden');
+                btnZip.classList.remove('flex');
+                boxIndiv.innerHTML = '';
+                
+                generatedIndividualFiles.forEach((file, idx) => {
+                    const btn = document.createElement('button');
+                    btn.className = "w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-xl shadow mt-2 flex items-center justify-center gap-2";
+                    btn.innerHTML = `<i data-lucide="download"></i> Descarregar Imagem ${idx + 1}`;
+                    btn.onclick = () => downloadStringAsFile(file.content, file.name);
+                    boxIndiv.appendChild(btn);
+                });
+                
+                boxIndiv.classList.remove('hidden');
+                boxIndiv.classList.add('flex');
+                lucide.createIcons();
+            }
+        }
+
+        // --- MANIPULAÇÃO SVG ---
+        function formatSVGDoc(rawDoc, injectMask) {
+            const svgEl = rawDoc.querySelector('svg');
+            const origW = svgEl.getAttribute('width'); const origH = svgEl.getAttribute('height');
+            if (origW && origH && !svgEl.getAttribute('viewBox')) svgEl.setAttribute('viewBox', `0 0 ${origW} ${origH}`);
+            svgEl.setAttribute('width', '100%'); svgEl.setAttribute('height', '100%');
+            
+            const gPaths = rawDoc.createElementNS('http://www.w3.org/2000/svg', 'g');
+            Array.from(rawDoc.querySelectorAll('path')).forEach(p => {
+                const fill = p.getAttribute('fill');
+                if (fill && (fill.includes('255') || fill === '#ffffff' || fill === 'white')) p.classList.add('bg-path');
+                else p.classList.add('ink-path');
+                gPaths.appendChild(p);
+            });
+            svgEl.innerHTML = ''; svgEl.appendChild(gPaths);
+
+            if (injectMask && hasMask && maskCtx) {
+                const maskB64 = maskCtx.canvas.toDataURL('image/png');
+                svgEl.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:xlink", "http://www.w3.org/1999/xlink");
+
+                const defs = rawDoc.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                const maskObj = rawDoc.createElementNS('http://www.w3.org/2000/svg', 'mask');
+                maskObj.setAttribute('id', 'photo-mask');
+                
+                const maskImg = rawDoc.createElementNS('http://www.w3.org/2000/svg', 'image');
+                maskImg.setAttribute('width', '100%'); maskImg.setAttribute('height', '100%');
+                maskImg.setAttributeNS('http://www.w3.org/1999/xlink', 'href', maskB64);
+                maskObj.appendChild(maskImg); defs.appendChild(maskObj);
+                svgEl.insertBefore(defs, svgEl.firstChild);
+
+                const photoOverlay = rawDoc.createElementNS('http://www.w3.org/2000/svg', 'image');
+                photoOverlay.setAttribute('width', '100%'); photoOverlay.setAttribute('height', '100%');
+                photoOverlay.setAttributeNS('http://www.w3.org/1999/xlink', 'href', currentBase64Original);
+                photoOverlay.setAttribute('mask', 'url(#photo-mask)');
+                svgEl.appendChild(photoOverlay);
+            }
+            return rawDoc;
+        }
+
+        function applySettingsToDoc(doc) {
+            const isTransp = document.getElementById('transparency-toggle') ? document.getElementById('transparency-toggle').checked : true;
+            const isMin = document.getElementById('minify-toggle') ? document.getElementById('minify-toggle').checked : true;
+            const stVal = document.getElementById('stroke-width-slider') ? document.getElementById('stroke-width-slider').value : '4';
+
+            if(isTransp) doc.querySelectorAll('.bg-path').forEach(b => b.remove());
+            
+            doc.querySelectorAll('.ink-path').forEach(p => {
+                p.setAttribute('fill', 'none'); p.setAttribute('stroke', 'black');
+                p.setAttribute('stroke-width', stVal + 'px'); p.setAttribute('stroke-linecap', 'round'); p.setAttribute('stroke-linejoin', 'round');
+                if (isMin) { let d = p.getAttribute('d'); if(d) p.setAttribute('d', d.replace(/\d+\.\d{2,}/g, m => parseFloat(m).toFixed(1))); }
+            });
         }
 
         function applySVGSettings() {
             if (!originalSvgDoc) return;
-
             const workDoc = originalSvgDoc.cloneNode(true);
-            const isTransparent = document.getElementById('transparency-toggle').checked;
-            const isStrokeMode = document.getElementById('mode-toggle').checked;
-            const isMinified = document.getElementById('minify-toggle').checked;
-            const strokeVal = document.getElementById('stroke-width-slider').value;
+            document.getElementById('stroke-value').innerText = document.getElementById('stroke-width-slider').value + "px";
             
-            document.getElementById('stroke-value').innerText = strokeVal + "px";
-            document.getElementById('stroke-controls').style.opacity = isStrokeMode ? "1" : "0.4";
-            document.getElementById('stroke-width-slider').disabled = !isStrokeMode;
-            
-            // Lógica do Fundo e do Fundo do Compare Container
-            const compareBg = document.getElementById('svg-preview-bg');
-            if(isTransparent) {
-                compareBg.classList.add('bg-checkerboard');
-                compareBg.classList.remove('bg-white');
-            } else {
-                compareBg.classList.add('bg-white');
-                compareBg.classList.remove('bg-checkerboard');
-            }
+            const isTransp = document.getElementById('transparency-toggle').checked;
+            const bg = document.getElementById('svg-preview-bg');
+            if(isTransp) { bg.classList.add('bg-checkerboard'); bg.classList.remove('bg-white'); }
+            else { bg.classList.add('bg-white'); bg.classList.remove('bg-checkerboard'); }
 
-            const layerFundo = workDoc.getElementById('camada-fundo');
-            if(isTransparent || !layersState['camada-fundo']) {
-                if(layerFundo) layerFundo.remove(); 
-            }
-
-            if(!layersState['camada-contornos']) { const l = workDoc.getElementById('camada-contornos'); if(l) l.remove(); }
-            if(!layersState['camada-hachuras']) { const l = workDoc.getElementById('camada-hachuras'); if(l) l.remove(); }
-
-            const inkPaths = workDoc.querySelectorAll('.ink-path');
-            inkPaths.forEach(p => {
-                if (isStrokeMode) {
-                    p.setAttribute('fill', 'none');
-                    p.setAttribute('stroke', 'black');
-                    p.setAttribute('stroke-width', strokeVal + 'px');
-                    p.setAttribute('stroke-linecap', 'round');
-                    p.setAttribute('stroke-linejoin', 'round');
-                } else {
-                    p.setAttribute('fill', 'black');
-                    p.setAttribute('stroke', 'none');
-                }
-            });
-
-            // OTIMIZAÇÃO (Minifier)
-            // Remove casas decimais excessivas geradas pela biblioteca (reduz tamanho em até 60%)
-            if (isMinified) {
-                const allPathsToMinify = workDoc.querySelectorAll('path');
-                allPathsToMinify.forEach(p => {
-                    let d = p.getAttribute('d');
-                    if(d) {
-                        // Regex: Procura por números com mais de 1 casa decimal e arredonda
-                        d = d.replace(/\d+\.\d{2,}/g, match => parseFloat(match).toFixed(1));
-                        p.setAttribute('d', d);
-                    }
-                });
-            }
-
-            const serializer = new XMLSerializer();
-            finalSVGString = serializer.serializeToString(workDoc);
+            applySettingsToDoc(workDoc);
+            finalSVGString = new XMLSerializer().serializeToString(workDoc);
             document.getElementById('svg-container').innerHTML = finalSVGString;
+        }
+
+        // --- EXPORTAÇÃO ---
+        function downloadStringAsFile(str, filename) {
+            const blob = new Blob([str], {type: "image/svg+xml;charset=utf-8"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
         }
 
         function downloadSVG() {
             if (!finalSVGString) return;
-            let exportString = finalSVGString;
-            if(!exportString.includes('xmlns="http://www.w3.org/2000/svg"')) {
-                exportString = exportString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
-            }
+            let str = finalSVGString;
+            if(!str.includes('xmlns="http://www.w3.org/2000/svg"')) str = str.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+            downloadStringAsFile(str, "arte_hachurada.svg");
+        }
 
-            const blob = new Blob([exportString], {type: "image/svg+xml;charset=utf-8"});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "arte_final_vetorial.svg";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+        function downloadZip() {
+            if (!generatedZip) return;
+            const url = URL.createObjectURL(generatedZip);
+            const a = document.createElement('a'); a.href = url; a.download = "lote_artes_vetoriais.zip";
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
         }
 
         function copySVGCode() {
             if (!finalSVGString) return;
-            const textArea = document.createElement("textarea");
-            textArea.value = finalSVGString;
-            document.body.appendChild(textArea);
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                alert("Código SVG otimizado e copiado! Pronto para ser usado.");
-            } catch (err) {
-                console.error("Falha ao copiar", err);
-            }
-            document.body.removeChild(textArea);
+            const t = document.createElement("textarea"); t.value = finalSVGString;
+            document.body.appendChild(t); t.select();
+            try { document.execCommand('copy'); alert("Código copiado!"); } catch (err) {} document.body.removeChild(t);
         }
     </script>
 </body>

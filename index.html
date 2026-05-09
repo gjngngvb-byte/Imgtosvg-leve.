@@ -203,7 +203,7 @@
                 <button onclick="location.reload()" class="mt-6 text-sm font-semibold text-green-700 hover:underline">Vetorizar novas imagens</button>
             </div>
 
-            <!-- Mensagem de Erro -->
+            <!-- Mensagem de Erro (Mantida para corrigir o erro classList) -->
             <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative mt-6" role="alert">
                 <strong class="font-bold">Erro!</strong>
                 <span class="block sm:inline" id="error-text">Ocorreu um erro ao processar.</span>
@@ -215,7 +215,7 @@
     <script>
         lucide.createIcons();
 
-        // Variável API Key requerida pelo ambiente. Preencha aqui para usar no seu GitHub, ou deixe vazio para injetar.
+        // Variável API Key estática no código
         const apiKey = ""; 
 
         // Estados Globais
